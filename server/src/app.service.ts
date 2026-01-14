@@ -47,16 +47,17 @@ export class AppService implements OnModuleInit {
     if ((await this.studentRepo.count()) === 0) {
       const course = await this.courseRepo.findOneBy({});
       if (course) {
-        const students = Array.from({ length: 10 }, (_, i) => ({
+        const students = Array.from({ length: 50 }, (_, i) => ({
           name: `Student ${i + 1}`,
           email: `student${i + 1}@school.com`,
           courseId: course.id,
           enrollmentDate: new Date().toISOString().split('T')[0],
           status: 'active',
           avatar: `https://ui-avatars.com/api/?name=Student+${i + 1}`,
+          photo: `https://images.unsplash.com/photo-1544717297-fa154da09f9d?w=200&h=200&fit=crop`,
         }));
         await this.studentRepo.save(students);
-        console.log('Seeded Students');
+        console.log('Seeded 50 Students');
       }
     }
   }
@@ -89,9 +90,14 @@ export class AppService implements OnModuleInit {
     await this.courseRepo.delete(id);
   }
 
-  // Students CRUD
-  async getStudents(): Promise<Student[]> {
-    return this.studentRepo.find();
+  // Students CRUD with Pagination
+  async getStudents(page: number = 1, limit: number = 10): Promise<{ data: Student[], total: number }> {
+    const [data, total] = await this.studentRepo.findAndCount({
+      skip: (page - 1) * limit,
+      take: limit,
+      order: { name: 'ASC' }
+    });
+    return { data, total };
   }
   async createStudent(student: Partial<Student>): Promise<Student> {
     return this.studentRepo.save(student);

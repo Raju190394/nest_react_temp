@@ -1,11 +1,11 @@
-
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, type ReactNode } from 'react';
 import type { User, Student, Course } from '../types';
 // Removed: import { mockUsers, mockStudents, mockCourses, delay } from '../store/mockData';
 
 interface DataContextType {
     users: User[];
     students: Student[];
+    totalStudents: number;
     courses: Course[];
 
     // User CRUD
@@ -13,7 +13,8 @@ interface DataContextType {
     updateUser: (id: string, user: Partial<User>) => Promise<void>;
     deleteUser: (id: string) => Promise<void>;
 
-    // Student CRUD
+    // Student CRUD with pagination support
+    fetchStudents: (page?: number, limit?: number) => Promise<void>;
     addStudent: (student: Omit<Student, 'id'>) => Promise<void>;
     updateStudent: (id: string, student: Partial<Student>) => Promise<void>;
     deleteStudent: (id: string) => Promise<void>;
@@ -31,19 +32,32 @@ const API_URL = 'http://localhost:3000/api';
 export const DataProvider = ({ children }: { children: ReactNode }) => {
     const [users, setUsers] = useState<User[]>([]);
     const [students, setStudents] = useState<Student[]>([]);
+    const [totalStudents, setTotalStudents] = useState(0);
     const [courses, setCourses] = useState<Course[]>([]);
+
+    const fetchStudents = async (page = 1, limit = 10) => {
+        try {
+            const res = await fetch(`${API_URL}/students?page=${page}&limit=${limit}`);
+            const result = await res.json();
+            setStudents(result.data || []);
+            setTotalStudents(result.total || 0);
+        } catch (error) {
+            console.error('Error fetching students:', error);
+        }
+    };
 
     const fetchData = async () => {
         try {
-            const [usersRes, studentsRes, coursesRes] = await Promise.all([
+            const [usersRes, coursesRes] = await Promise.all([
                 fetch(`${API_URL}/users`),
-                fetch(`${API_URL}/students`),
                 fetch(`${API_URL}/courses`)
             ]);
             setUsers(await usersRes.json());
-            setStudents(await studentsRes.json());
             const coursesData = await coursesRes.json();
             setCourses(coursesData.map((c: any) => ({ ...c, price: Number(c.price) })));
+
+            // Fetch first page of students
+            await fetchStudents(1, 10);
         } catch (error) {
             console.error('Error fetching data:', error);
         }
@@ -78,22 +92,60 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     };
 
     // Students
-    const addStudent = async (studentData: Omit<Student, 'id'>) => {
-        await fetch(`${API_URL}/students`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(studentData)
+    const addStudent = async (studentData: any) => {
+        const formData = new FormData();
+        Object.keys(studentData).forEach(key => {
+            const value = studentData[key];
+            if (key === 'photo') {
+                if (value instanceof File) {
+                    formData.append('photo', value);
+                } else if (typeof value === 'string' && value.startsWith('http')) {
+                    formData.append('photo', value);
+                }
+            } else if (value !== undefined && value !== null) {
+                formData.append(key, String(value));
+            }
         });
-        fetchData();
+
+        const res = await fetch(`${API_URL}/students`, {
+            method: 'POST',
+            body: formData
+        });
+
+        if (!res.ok) {
+            const error = await res.json();
+            throw new Error(error.message || 'Failed to add student');
+        }
+
+        await fetchData();
     };
 
-    const updateStudent = async (id: string, updates: Partial<Student>) => {
-        await fetch(`${API_URL}/students/${id}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(updates)
+    const updateStudent = async (id: string, updates: any) => {
+        const formData = new FormData();
+        Object.keys(updates).forEach(key => {
+            const value = updates[key];
+            if (key === 'photo') {
+                if (value instanceof File) {
+                    formData.append('photo', value);
+                } else if (typeof value === 'string' && value.startsWith('http')) {
+                    formData.append('photo', value);
+                }
+            } else if (value !== undefined && value !== null) {
+                formData.append(key, String(value));
+            }
         });
-        fetchData();
+
+        const res = await fetch(`${API_URL}/students/${id}`, {
+            method: 'PUT',
+            body: formData
+        });
+
+        if (!res.ok) {
+            const error = await res.json();
+            throw new Error(error.message || 'Failed to update student');
+        }
+
+        await fetchData();
     };
 
     const deleteStudent = async (id: string) => {
@@ -127,9 +179,9 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
 
     return (
         <DataContext.Provider value={{
-            users, students, courses,
+            users, students, totalStudents, courses,
             addUser, updateUser, deleteUser,
-            addStudent, updateStudent, deleteStudent,
+            fetchStudents, addStudent, updateStudent, deleteStudent,
             addCourse, updateCourse, deleteCourse
         }}>
             {children}

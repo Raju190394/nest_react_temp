@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useData } from '../context/DataContext';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
@@ -13,6 +13,7 @@ const studentSchema = z.object({
     courseId: z.string().min(1, 'Course is required'),
     enrollmentDate: z.string().min(1, 'Date is required'),
     status: z.enum(['active', 'dropped', 'graduated']),
+    photo: z.any().optional(),
 });
 
 type StudentFormData = z.infer<typeof studentSchema>;
@@ -22,6 +23,7 @@ export const StudentsPage = () => {
     const [search, setSearch] = useState('');
     const [sort, setSort] = useState<'asc' | 'desc'>('asc');
     const [page, setPage] = useState(1);
+    const [previewUrl, setPreviewUrl] = useState<string | null>(null);
     const pageSize = 5;
 
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -52,7 +54,8 @@ export const StudentsPage = () => {
                 email: student.email,
                 courseId: student.courseId,
                 enrollmentDate: student.enrollmentDate,
-                status: student.status
+                status: student.status,
+                photo: student.photo || ''
             });
         } else {
             setEditingStudent(null);
@@ -61,20 +64,26 @@ export const StudentsPage = () => {
                 email: '',
                 courseId: courses[0]?.id || '',
                 enrollmentDate: new Date().toISOString().split('T')[0],
-                status: 'active'
+                status: 'active',
+                photo: ''
             });
         }
+        setPreviewUrl(student?.photo || null);
         setIsModalOpen(true);
     };
 
     const onSubmit = async (data: StudentFormData) => {
-        if (editingStudent) {
-            await updateStudent(editingStudent.id, data);
-        } else {
-            await addStudent(data);
+        try {
+            if (editingStudent) {
+                await updateStudent(editingStudent.id, data);
+            } else {
+                await addStudent(data);
+            }
+            setIsModalOpen(false);
+            reset();
+        } catch (error: any) {
+            alert(error.message || 'Something went wrong');
         }
-        setIsModalOpen(false);
-        reset();
     };
 
     const handleDelete = async (id: string) => {
@@ -138,7 +147,11 @@ export const StudentsPage = () => {
                                     <tr key={student.id} className="hover:bg-gray-50/50 transition-colors">
                                         <td className="px-6 py-4">
                                             <div className="flex items-center gap-3">
-                                                <img src={student.avatar} alt="" className="w-10 h-10 rounded-full bg-gray-100" />
+                                                <img
+                                                    src={student.photo || student.avatar}
+                                                    alt=""
+                                                    className="w-10 h-10 rounded-full bg-gray-100 object-cover border border-gray-100 shadow-sm"
+                                                />
                                                 <div>
                                                     <p className="font-semibold text-gray-900">{student.name}</p>
                                                     <p className="text-gray-500 text-xs">{student.email}</p>
@@ -253,6 +266,34 @@ export const StudentsPage = () => {
                                 <option value="dropped">Dropped</option>
                                 <option value="graduated">Graduated</option>
                             </select>
+                        </div>
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Student Photo</label>
+                        <div className="flex items-center gap-4">
+                            {(previewUrl || editingStudent?.avatar) && (
+                                <img
+                                    src={previewUrl || editingStudent?.avatar}
+                                    className="w-16 h-16 rounded-xl object-cover border-2 border-indigo-50"
+                                    alt="Preview"
+                                />
+                            )}
+                            <div className="flex-1">
+                                <input
+                                    type="file"
+                                    accept="image/*"
+                                    onChange={(e) => {
+                                        const file = e.target.files?.[0];
+                                        if (file) {
+                                            reset({ ...editingStudent, photo: file } as any);
+                                            setPreviewUrl(URL.createObjectURL(file));
+                                        }
+                                    }}
+                                    className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 transition-all"
+                                />
+                                <p className="text-[10px] text-gray-400 mt-1">PNG, JPG or GIF (Max 2MB)</p>
+                            </div>
                         </div>
                     </div>
 

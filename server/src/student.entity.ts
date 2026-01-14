@@ -1,5 +1,5 @@
 
-import { Entity, Column, PrimaryGeneratedColumn } from 'typeorm';
+import { Entity, Column, PrimaryGeneratedColumn, Index } from 'typeorm';
 
 @Entity()
 export class Student {
@@ -9,6 +9,7 @@ export class Student {
     @Column()
     name: string;
 
+    @Index()
     @Column()
     email: string;
 
@@ -23,4 +24,7 @@ export class Student {
 
     @Column({ nullable: true })
     avatar: string;
+
+    @Column({ nullable: true })
+    photo: string;
 }

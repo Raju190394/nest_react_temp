@@ -15,6 +15,7 @@ export interface Student {
     enrollmentDate: string;
     status: 'active' | 'dropped' | 'graduated';
     avatar?: string;
+    photo?: string;
 }
 
 export interface Course {
