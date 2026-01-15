@@ -154,22 +154,60 @@ export const DataProvider = ({ children }: { children: ReactNode }) => {
     };
 
     // Courses
-    const addCourse = async (courseData: Omit<Course, 'id'>) => {
-        await fetch(`${API_URL}/courses`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(courseData)
+    const addCourse = async (courseData: any) => {
+        const formData = new FormData();
+        Object.keys(courseData).forEach(key => {
+            const value = courseData[key];
+            if (key === 'thumbnail') {
+                if (value instanceof File) {
+                    formData.append('thumbnail', value);
+                } else if (typeof value === 'string' && value.startsWith('http')) {
+                    formData.append('thumbnail', value);
+                }
+            } else if (value !== undefined && value !== null) {
+                formData.append(key, String(value));
+            }
         });
-        fetchData();
+
+        const res = await fetch(`${API_URL}/courses`, {
+            method: 'POST',
+            body: formData
+        });
+
+        if (!res.ok) {
+            const error = await res.json();
+            throw new Error(error.message || 'Failed to add course');
+        }
+
+        await fetchData();
     };
 
-    const updateCourse = async (id: string, updates: Partial<Course>) => {
-        await fetch(`${API_URL}/courses/${id}`, {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(updates)
+    const updateCourse = async (id: string, updates: any) => {
+        const formData = new FormData();
+        Object.keys(updates).forEach(key => {
+            const value = updates[key];
+            if (key === 'thumbnail') {
+                if (value instanceof File) {
+                    formData.append('thumbnail', value);
+                } else if (typeof value === 'string' && value.startsWith('http')) {
+                    formData.append('thumbnail', value);
+                }
+            } else if (value !== undefined && value !== null) {
+                formData.append(key, String(value));
+            }
         });
-        fetchData();
+
+        const res = await fetch(`${API_URL}/courses/${id}`, {
+            method: 'PUT',
+            body: formData
+        });
+
+        if (!res.ok) {
+            const error = await res.json();
+            throw new Error(error.message || 'Failed to update course');
+        }
+
+        await fetchData();
     };
 
     const deleteCourse = async (id: string) => {

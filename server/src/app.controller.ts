@@ -36,14 +36,45 @@ export class AppController {
   getCourses() {
     return this.appService.getCourses();
   }
+
   @Post('courses')
-  createCourse(@Body() body: any) {
+  @UseInterceptors(FileInterceptor('thumbnail', {
+    storage: diskStorage({
+      destination: './uploads',
+      filename: (req, file, cb) => {
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        cb(null, `course-${uniqueSuffix}${extname(file.originalname)}`);
+      },
+    }),
+  }))
+  createCourse(@Body() body: any, @UploadedFile() file: Express.Multer.File) {
+    if (file) {
+      body.thumbnail = `http://localhost:3000/uploads/${file.filename}`;
+    }
+    // Convert price to number if it's sent as string
+    if (body.price) body.price = Number(body.price);
     return this.appService.createCourse(body);
   }
+
   @Put('courses/:id')
-  updateCourse(@Param('id') id: string, @Body() body: any) {
+  @UseInterceptors(FileInterceptor('thumbnail', {
+    storage: diskStorage({
+      destination: './uploads',
+      filename: (req, file, cb) => {
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        cb(null, `course-${uniqueSuffix}${extname(file.originalname)}`);
+      },
+    }),
+  }))
+  updateCourse(@Param('id') id: string, @Body() body: any, @UploadedFile() file: Express.Multer.File) {
+    if (file) {
+      body.thumbnail = `http://localhost:3000/uploads/${file.filename}`;
+    }
+    // Convert price to number if it's sent as string
+    if (body.price) body.price = Number(body.price);
     return this.appService.updateCourse(id, body);
   }
+
   @Delete('courses/:id')
   deleteCourse(@Param('id') id: string) {
     return this.appService.deleteCourse(id);

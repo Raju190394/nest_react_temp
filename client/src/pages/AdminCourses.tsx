@@ -3,7 +3,7 @@ import { useData } from '../context/DataContext';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Search, Plus, Edit2, Trash2, ChevronLeft, ChevronRight, ArrowUpDown, Image } from 'lucide-react';
+import { Search, Plus, Edit2, Trash2, ChevronLeft, ChevronRight, ArrowUpDown, Image as ImageIcon, Upload } from 'lucide-react';
 import { Modal } from '../components/UI/Modal';
 import type { Course } from '../types';
 
@@ -13,7 +13,7 @@ const courseSchema = z.object({
     price: z.number({ invalid_type_error: "Price must be a number" }).min(0, 'Price must be positive'),
     duration: z.string().min(2, 'Duration is required'),
     instructor: z.string().min(2, 'Instructor is required'),
-    thumbnail: z.string().url('Invalid URL').optional().or(z.literal('')),
+    thumbnail: z.any().optional(), // Can be File or string (URL)
 });
 
 type CourseFormData = z.infer<typeof courseSchema>;
@@ -27,11 +27,14 @@ export const AdminCoursesPage = () => {
 
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [editingCourse, setEditingCourse] = useState<Course | null>(null);
+    const [previewUrl, setPreviewUrl] = useState<string | null>(null);
 
-    const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<CourseFormData>({
+    const { register, handleSubmit, reset, setValue, watch, formState: { errors, isSubmitting } } = useForm<CourseFormData>({
         resolver: zodResolver(courseSchema),
         defaultValues: { price: 0 }
     });
+
+    const thumbnailFile = watch('thumbnail');
 
     const filteredCourses = courses.filter(c =>
         c.title.toLowerCase().includes(search.toLowerCase()) ||
@@ -54,6 +57,7 @@ export const AdminCoursesPage = () => {
                 instructor: course.instructor,
                 thumbnail: course.thumbnail || ''
             });
+            setPreviewUrl(course.thumbnail || null);
         } else {
             setEditingCourse(null);
             reset({
@@ -64,21 +68,36 @@ export const AdminCoursesPage = () => {
                 instructor: '',
                 thumbnail: ''
             });
+            setPreviewUrl(null);
         }
         setIsModalOpen(true);
     };
 
-    const onSubmit = async (data: CourseFormData) => {
-        // Clean up undefined/empty string thumbnail
-        const cleanData = { ...data, thumbnail: data.thumbnail || undefined };
-
-        if (editingCourse) {
-            await updateCourse(editingCourse.id, cleanData);
-        } else {
-            await addCourse(cleanData);
+    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (file) {
+            setValue('thumbnail', file);
+            const reader = new FileReader();
+            reader.onloadend = () => {
+                setPreviewUrl(reader.result as string);
+            };
+            reader.readAsDataURL(file);
         }
-        setIsModalOpen(false);
-        reset();
+    };
+
+    const onSubmit = async (data: CourseFormData) => {
+        try {
+            if (editingCourse) {
+                await updateCourse(editingCourse.id, data);
+            } else {
+                await addCourse(data);
+            }
+            setIsModalOpen(false);
+            reset();
+            setPreviewUrl(null);
+        } catch (error: any) {
+            alert(error.message);
+        }
     };
 
     const handleDelete = async (id: string) => {
@@ -248,9 +267,29 @@ export const AdminCoursesPage = () => {
                             {errors.instructor && <p className="text-xs text-red-500 mt-1">{errors.instructor.message}</p>}
                         </div>
                         <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Thumbnail URL</label>
-                            <input {...register('thumbnail')} className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500" placeholder="https://..." />
-                            {errors.thumbnail && <p className="text-xs text-red-500 mt-1">{errors.thumbnail.message}</p>}
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Thumbnail Overlay</label>
+                            <div className="flex items-center gap-4">
+                                <div className="w-16 h-16 rounded-xl bg-gray-50 border-2 border-dashed border-gray-200 flex items-center justify-center overflow-hidden">
+                                    {previewUrl ? (
+                                        <img src={previewUrl} alt="Preview" className="w-full h-full object-cover" />
+                                    ) : (
+                                        <ImageIcon className="text-gray-300" size={24} />
+                                    )}
+                                </div>
+                                <label className="flex-1">
+                                    <div className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-lg text-sm font-medium text-gray-600 hover:bg-gray-50 cursor-pointer transition-colors">
+                                        <Upload size={16} />
+                                        <span>Upload File</span>
+                                    </div>
+                                    <input
+                                        type="file"
+                                        accept="image/*"
+                                        className="hidden"
+                                        onChange={handleFileChange}
+                                    />
+                                </label>
+                            </div>
+                            {errors.thumbnail && <p className="text-xs text-red-500 mt-1">{errors.thumbnail.message as string}</p>}
                         </div>
                     </div>
 
